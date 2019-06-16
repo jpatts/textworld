@@ -1,0 +1,26 @@
+general:
+  name: null #specific name of session
+  data_dir: '/home/jojo/Documents/textworld/sample_games/' #location of game data
+
+checkpoint:
+  save_dir: './saves' #directory to save in
+  save_freq: 10 #episodes before saving
+
+logging:
+  log_dir: './logs' #directory to log in
+  log_freq: 1 #episodes before logging
+
+vocab:
+  size: 20200 #unique words/chars in dataset
+  max_len: 10 #maximum size of input command
+
+train:
+  learning_rate: 0.001 #gradient step size
+  batch_size: 1
+  epochs: 100 #episodes
+  max_steps: 50  #episode ends after 50 actions
+  optim: 'adam'
+
+model:
+  embedding_size: 64 #of each word vector (4th root = 12), neurons in GRU
+  num_phrases: 128 #possible phrase cmd preposition combos (19 cmds * 9 prepositions = 171 * total_possible_entities = num_out)
