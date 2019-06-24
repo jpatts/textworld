@@ -12,7 +12,6 @@ logging:
 
 vocab:
   size: 20200 #unique words/chars in dataset
-  max_len: 10 #maximum size of input command
 
 train:
   learning_rate: 0.001 #gradient step size
@@ -24,3 +23,4 @@ train:
 model:
   embedding_size: 64 #of each word vector (4th root = 12), neurons in GRU
   num_phrases: 128 #possible phrase cmd preposition combos (19 cmds * 9 prepositions = 171 * total_possible_entities = num_out)
+  units: 1024 #number of neurons in gru
