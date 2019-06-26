@@ -4,6 +4,7 @@ import tensorflow as tf
 from tqdm import trange
 from textworld import EnvInfos
 from models import Seq2seq
+from utils.writer import Writer
 
 tf.enable_eager_execution()
 # Load cfg
@@ -56,6 +57,7 @@ class CustomAgent:
         self.possible_cmds_encoded = [self.word2id[cmd] for cmd in self.possible_cmds]
         self.preposition_map_encoded = {self.word2id[key]: self.word2id[val] for (key, val) in self.preposition_map.items()}
         self.epoch = tf.Variable(0)
+        self.writer = Writer(cfg['writing']['extension'], cfg['writing']['save_dir'], cfg['writing']['log_dir'], cfg['writing']['log_freq'])
     
     def update_entities(self, obs):
         # Loop through batches
@@ -211,6 +213,7 @@ class CustomAgent:
                     target.append(target_batch)
 
                 target = np.array(target)
+                one_hot_target = tf.one_hot(target, depth=self.vocab_size).numpy()
                 # Get starting index for each batch of target
                 curr_targets = [[x for x in range(self.batch_size)], [0 for x in range(self.batch_size)]]
                 # End condition
@@ -223,7 +226,7 @@ class CustomAgent:
                     # Compute gradients
                     with tf.GradientTape() as tape:
                         # Get actions
-                        predictions = self.model(x_in, self.max_entity_len)
+                        logits, predictions = self.model(x_in, self.max_cmd_len)
                         
                         # Convert from ids to words
                         commands = []
@@ -237,20 +240,25 @@ class CustomAgent:
                         # Perform commands
                         obs, score, done, infos = self.env.step(commands)
                         print(commands)
-                        score = np.reshape(score, (self.batch_size, 1))
+                        #score = np.reshape(score, (self.batch_size, self.max_cmd_len, self.vocab_size))
 
                         # Compare target and predicted
-                        loss = 1/2 * tf.reduce_mean(tf.losses.huber_loss(score + self.discount * target[curr_targets], predictions))
+                        #loss = 1/2 * tf.reduce_mean(tf.losses.huber_loss(score + self.discount * one_hot_target[curr_targets], logits))
+                        loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(one_hot_target[curr_targets], logits))
 
+                    # Log
+                    self.writer.log(self.optim, tape, loss)
+                    self.writer.global_step.assign_add(1)
+                    
+                    # Calculate and apply gradients
                     grads = tape.gradient(loss, self.model.weights)
-                    print(grads)
-                    exit(1)
                     grads_and_vars = zip(grads, self.model.weights)
                     self.optim.apply_gradients(grads_and_vars)
 
-                    if predictions.any() == curr_targets.any():
-                        print("boo")
-                        exit(1)
+                    #if predictions.any() == curr_targets.any():
+                    # update index for curr_targets
+                    #    print("boo")
+                    #    exit(1)
 
 def main():
     model = CustomAgent()

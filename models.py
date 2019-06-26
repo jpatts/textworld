@@ -7,25 +7,33 @@ class Seq2seq(tf.keras.Model):
         super(Seq2seq, self).__init__()
         self.encoder = Encoder(vocab_size, embedding_size, batch_size, units)
         self.decoder = Decoder(vocab_size, embedding_size, units)
+        self.vocab_size = vocab_size
         self.batch_size = batch_size
         self.start = start
         self.end = end
     
-    def call(self, enc_in, max_entity_length):
+    def call(self, enc_in, max_cmd_len):
+        # Get encoded data and hidden state
         encoded, self.enc_hidden = self.encoder(enc_in)
+        # Initialize decoder input, hidden state
         dec_in = tf.expand_dims([self.start] * self.batch_size, 1)
-        predictions = tf.zeros((self.batch_size, max_entity_length), dtype=tf.dtypes.int64)
         dec_hidden = self.enc_hidden
-        for t in range(2 + (2*max_entity_length)):
-            x_out, self.dec_hidden, attn = self.decoder(dec_in, dec_hidden, encoded)
-            pred = tf.reshape(tf.argmax(x_out, 1), [self.batch_size, 1])
+        # Initialize output data structures
+        logits = tf.zeros((self.batch_size, 1, self.vocab_size))
+        predictions = tf.zeros((self.batch_size, 1), dtype=tf.dtypes.int64)
+        # For timestep in max timesteps
+        for t in range(max_cmd_len):
+            # Get logits at timestep
+            logits_t, dec_hidden, attn = self.decoder(dec_in, dec_hidden, encoded)
+            # Save logits
+            logits = tf.concat([logits[:, :t], tf.expand_dims(logits_t, 1)], 1)
+            # Save prediction
+            pred = tf.reshape(tf.argmax(logits_t, 1), [self.batch_size, 1])
             predictions = tf.concat([predictions[:, :t], pred], 1)
-            # end tokens generated
-            if tf.reduce_all(tf.equal(pred, self.end)):
-                break
+            # Update input for next timestep
             dec_in = pred
         
-        return predictions
+        return logits, predictions
 
 
 class Encoder(tf.keras.layers.Layer):

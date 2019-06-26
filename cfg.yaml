@@ -2,13 +2,12 @@ general:
   name: null #specific name of session
   data_dir: '/home/jojo/Documents/textworld/sample_games/' #location of game data
 
-checkpoint:
-  save_dir: './saves' #directory to save in
+writing:
+  extension: '' #name to save as
+  save_dir: './saves/' #directory to save in
   save_freq: 10 #episodes before saving
-
-logging:
-  log_dir: './logs' #directory to log in
-  log_freq: 1 #episodes before logging
+  log_dir: './logs/' #directory to log in
+  log_freq: 10 #episodes before logging
 
 vocab:
   size: 20200 #unique words/chars in dataset
