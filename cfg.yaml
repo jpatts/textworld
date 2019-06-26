@@ -15,7 +15,7 @@ vocab:
 
 train:
   learning_rate: 0.001 #gradient step size
-  batch_size: 1
+  batch_size: 2
   epochs: 100 #episodes
   max_steps: 50  #episode ends after 50 actions
   optim: 'adam'

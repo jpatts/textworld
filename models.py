@@ -16,11 +16,11 @@ class Seq2seq(tf.keras.Model):
         dec_in = tf.expand_dims([self.start] * self.batch_size, 1)
         predictions = tf.zeros((self.batch_size, max_entity_length), dtype=tf.dtypes.int64)
         dec_hidden = self.enc_hidden
-        for t in range(max_entity_length):
+        for t in range(2 + (2*max_entity_length)):
             x_out, self.dec_hidden, attn = self.decoder(dec_in, dec_hidden, encoded)
             pred = tf.reshape(tf.argmax(x_out, 1), [self.batch_size, 1])
             predictions = tf.concat([predictions[:, :t], pred], 1)
-            # end token generated
+            # end tokens generated
             if tf.reduce_all(tf.equal(pred, self.end)):
                 break
             dec_in = pred
@@ -90,7 +90,7 @@ class Decoder(tf.keras.layers.Layer):
         concatenated = tf.concat([tf.expand_dims(context_vector, 1), embedded], axis=-1)
 
         decoded, dec_hidden = self.gru(concatenated)
-
+        
         # (batch_size * 1, hidden_size)
         decoded = tf.reshape(decoded, (-1, decoded.shape[2]))
 
