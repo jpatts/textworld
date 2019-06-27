@@ -3,26 +3,25 @@ import numpy as np
 
 
 class Seq2seq(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_size, batch_size, units, start, end):
+    def __init__(self, vocab_size, embedding_size, batch_size, units):
         super(Seq2seq, self).__init__()
         self.encoder = Encoder(vocab_size, embedding_size, batch_size, units)
         self.decoder = Decoder(vocab_size, embedding_size, units)
         self.vocab_size = vocab_size
         self.batch_size = batch_size
-        self.start = start
-        self.end = end
     
-    def call(self, enc_in, max_cmd_len):
+    def call(self, enc_in, max_cmd_len, teacher):
         # Get encoded data and hidden state
         encoded, self.enc_hidden = self.encoder(enc_in)
-        # Initialize decoder input, hidden state
-        dec_in = tf.expand_dims([self.start] * self.batch_size, 1)
+        # Init hidden state
         dec_hidden = self.enc_hidden
-        # Initialize output data structures
+        # Init output data structures
         logits = tf.zeros((self.batch_size, 1, self.vocab_size))
         predictions = tf.zeros((self.batch_size, 1), dtype=tf.dtypes.int64)
         # For timestep in max timesteps
         for t in range(max_cmd_len):
+            # Get input for timestep
+            dec_in = tf.expand_dims(teacher[:, t], 1)
             # Get logits at timestep
             logits_t, dec_hidden, attn = self.decoder(dec_in, dec_hidden, encoded)
             # Save logits
@@ -30,8 +29,6 @@ class Seq2seq(tf.keras.Model):
             # Save prediction
             pred = tf.reshape(tf.argmax(logits_t, 1), [self.batch_size, 1])
             predictions = tf.concat([predictions[:, :t], pred], 1)
-            # Update input for next timestep
-            dec_in = pred
         
         return logits, predictions
 
@@ -80,12 +77,11 @@ class BahdanauAttention(tf.keras.Model):
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, vocab_size, embedding_size, dec_units):
         super(Decoder, self).__init__()
-        self.dec_units = dec_units
         
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_size)
         self.gru = tf.keras.layers.GRU(dec_units, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
         self.fc = tf.keras.layers.Dense(vocab_size)
-        self.attention = BahdanauAttention(self.dec_units)
+        self.attention = BahdanauAttention(dec_units)
 
     def call(self, x_in, enc_hidden, encoded):
         # (batch_size, max_length, hidden_size)

@@ -1,4 +1,4 @@
-import glob, yaml, re, spacy, gym, textworld.gym
+import random, glob, yaml, re, spacy, gym, textworld.gym
 import numpy as np
 import tensorflow as tf
 from tqdm import trange
@@ -10,6 +10,31 @@ tf.enable_eager_execution()
 # Load cfg
 with open('cfg.yaml') as reader:
     cfg = yaml.safe_load(reader)
+
+class Replay:
+    
+    def __init__(self):
+        self.memory = []
+        self.cap = cfg["replay"]["cap"]
+        self.batch_size = cfg["train"]["batch_size"]
+
+    def push(self, exp):
+        size = len(self.memory)
+        # Remove oldest memory first
+        if size == self.cap:
+            self.memory.pop(random.randint(0, size-1))
+        self.memory.append(exp)
+    
+    def fetch(self):
+        size = len(self.memory)
+        # Select batch
+        if size < self.batch_size:
+            batch = random.sample(self.memory, size)
+        else:
+            batch = random.sample(self.memory, self.batch_size)
+            
+        return zip(*batch)
+
 
 class CustomAgent:
 
@@ -39,9 +64,9 @@ class CustomAgent:
         self.embedding_size = cfg['model']['embedding_size']
         self.batch_size = cfg['train']['batch_size']
         self.units = cfg['model']['units']
-        self.model = Seq2seq(self.vocab_size, self.embedding_size, self.batch_size, self.units, self.start, self.end)
+        self.model = Seq2seq(self.vocab_size, self.embedding_size, self.batch_size, self.units)
         self.optim = tf.train.AdamOptimizer(cfg['train']['learning_rate'])
-        self.discount = 0.99
+        self.replay = Replay()
 
         # Start session
         requested_infos = EnvInfos(extras=['walkthrough'])
@@ -167,6 +192,29 @@ class CustomAgent:
         
         batched_curr_entities = tf.reshape(np.array(batched_curr_entities), [self.batch_size, max_len])
         return batched_curr_entities
+    
+    def update(self):
+        # Compute gradients
+        with tf.GradientTape() as tape:
+            x_in, target, teacher, scores = self.replay.fetch()
+            logits, _ = self.model(x_in[0], self.max_cmd_len, teacher[0])
+
+            # Compare target and predicted
+            loss = tf.losses.softmax_cross_entropy(target[0], logits, reduction='none')
+            #loss = 1/2 * tf.reduce_mean(tf.losses.huber_loss(score + self.discount * one_hot_target[curr_targets], logits))
+            # Apply mask to remove pad gradients
+            mask = tf.cast(tf.math.logical_not(tf.math.equal(teacher[0], 0)), dtype=tf.dtypes.float32)
+            loss = loss * mask
+            loss = tf.reduce_mean(loss)
+
+            # Log
+            self.writer.log(self.optim, tape, loss)
+            self.writer.global_step.assign_add(1)
+            
+            # Calculate and apply gradients
+            grads = tape.gradient(loss, self.model.weights)
+            grads_and_vars = zip(grads, self.model.weights)
+            self.optim.apply_gradients(grads_and_vars)
 
     def train(self):
         for epoch in trange(1, cfg['train']['epochs']):
@@ -216,49 +264,52 @@ class CustomAgent:
                 one_hot_target = tf.one_hot(target, depth=self.vocab_size).numpy()
                 # Get starting index for each batch of target
                 curr_targets = [[x for x in range(self.batch_size)], [0 for x in range(self.batch_size)]]
-                # End condition
+                # Init loop vars
                 dones = [False] * self.batch_size
+                scores = [0] * self.batch_size
+                memories = []
                 while not all(dones):
                     # Update global entity list
                     self.update_entities(obs)
                     # Get input data
                     x_in = self.get_start_entity_end_pad_format()
-                    # Compute gradients
-                    with tf.GradientTape() as tape:
-                        # Get actions
-                        logits, predictions = self.model(x_in, self.max_cmd_len)
-                        
-                        # Convert from ids to words
-                        commands = []
-                        for batch in predictions:
-                            final = ''
-                            for id_ in batch:
-                                if id_ != self.pad and id_ != self.start and id_ != self.end:
-                                    final += self.vocab[id_] + ' '
-                            commands.append(final.strip())
-                            
-                        # Perform commands
-                        obs, score, done, infos = self.env.step(commands)
-                        print(commands)
-                        #score = np.reshape(score, (self.batch_size, self.max_cmd_len, self.vocab_size))
+                    teacher = target[tuple(curr_targets)]
+                    logits, predictions = self.model(x_in, self.max_cmd_len, teacher)
 
-                        # Compare target and predicted
-                        #loss = 1/2 * tf.reduce_mean(tf.losses.huber_loss(score + self.discount * one_hot_target[curr_targets], logits))
-                        loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(one_hot_target[curr_targets], logits))
+                    # Ignore padded chars
+                    mask1 = tf.cast(tf.math.logical_not(tf.math.equal(one_hot_target[tuple(curr_targets)], 0)), dtype=tf.dtypes.float32)
+                    logits = logits * mask1
 
-                    # Log
-                    self.writer.log(self.optim, tape, loss)
-                    self.writer.global_step.assign_add(1)
+                    mask2 = tf.cast(tf.math.logical_not(tf.math.equal(target[tuple(curr_targets)], 0)), dtype=tf.dtypes.int64)
+                    predictions = predictions * mask2
                     
-                    # Calculate and apply gradients
-                    grads = tape.gradient(loss, self.model.weights)
-                    grads_and_vars = zip(grads, self.model.weights)
-                    self.optim.apply_gradients(grads_and_vars)
+                    # Convert from ids to words
+                    commands = []
+                    for batch in predictions:
+                        final = ''
+                        for id_ in batch:
+                            if id_ != self.pad and id_ != self.start and id_ != self.end:
+                                final += self.vocab[id_] + ' '
+                        commands.append(final.strip())
+                    
+                    # Perform commands
+                    obs, scores, dones, infos = self.env.step(commands)
+                    print(commands)
+                    #score = np.reshape(score, (self.batch_size, self.max_cmd_len, self.vocab_size))
+                    memories.append([x_in, one_hot_target[tuple(curr_targets)], teacher])
 
-                    #if predictions.any() == curr_targets.any():
-                    # update index for curr_targets
-                    #    print("boo")
-                    #    exit(1)
+                    # Increment target indexes for successful batch commands
+                    correct = tf.cast(tf.math.equal(target[tuple(curr_targets)], predictions), dtype=tf.dtypes.float32)
+                    for b, batch in enumerate(correct):
+                        # if 1 for each column
+                        if int(tf.reduce_sum(tf.abs(batch))) == self.max_cmd_len:
+                            curr_targets[1][b] += 1
+
+                # Add end-game score to memories, add memories to experience replay
+                for i in range(len(memories)):
+                    memories[i].append(scores)
+                    self.replay.push(memories[i])
+                self.update()
 
 def main():
     model = CustomAgent()
