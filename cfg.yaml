@@ -31,9 +31,9 @@ cap: 2000 #max transitions in replay memory
 #**************
 # Train Params
 #**************
-learning_rate: 0.001 #gradient step size
+learning_rate: 0.0001 #gradient step size
 num_agents: 1
-batch_size: 8
+batch_size: 16
 epochs: 100 #episodes
 max_steps: 10  #episode ends after 50 actions
 optim: 'adam'

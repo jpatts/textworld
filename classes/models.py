@@ -12,6 +12,7 @@ class Seq2seq(tf.keras.Model):
     def call(self, enc_in, max_cmd_len, teacher):
         # Get encoded data and hidden state
         encoded, enc_hidden = self.encoder(enc_in)
+        
         batch_size = enc_hidden.shape[0]
         # Init hidden state
         dec_hidden = enc_hidden
@@ -52,27 +53,6 @@ class Encoder(tf.keras.layers.Layer):
         self.enc_hidden = tf.zeros((batch_size, self.enc_units))
 
 
-class BahdanauAttention(tf.keras.Model):
-  def __init__(self, units):
-    super(BahdanauAttention, self).__init__()
-    self.W1 = tf.keras.layers.Dense(units)
-    self.W2 = tf.keras.layers.Dense(units)
-    self.V = tf.keras.layers.Dense(1)
-
-  def call(self, enc_hidden, encoded):
-    # (batch_size, max_length, 1)
-    score = self.V(tf.nn.tanh(
-        self.W1(encoded) + self.W2(tf.expand_dims(enc_hidden, 1))))
-
-    # (batch_size, max_length, 1)
-    attention_weights = tf.nn.softmax(score, axis=1)
-
-    # (batch_size, hidden_size)
-    context_vector = tf.reduce_sum(input_tensor=attention_weights * encoded, axis=1)
-
-    return context_vector, attention_weights
-    
-
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, vocab_size, embedding_size, dec_units):
         super(Decoder, self).__init__()
@@ -101,3 +81,25 @@ class Decoder(tf.keras.layers.Layer):
         x_out = self.fc(decoded)
 
         return x_out, dec_hidden, attention_weights
+
+
+class BahdanauAttention(tf.keras.Model):
+  def __init__(self, units):
+    super(BahdanauAttention, self).__init__()
+    self.W1 = tf.keras.layers.Dense(units)
+    self.W2 = tf.keras.layers.Dense(units)
+    self.V = tf.keras.layers.Dense(1)
+
+  def call(self, enc_hidden, encoded):
+    # (batch_size, max_length, 1)
+    score = self.V(tf.nn.tanh(
+        self.W1(encoded) + self.W2(tf.expand_dims(enc_hidden, 1))))
+
+    # (batch_size, max_length, 1)
+    attention_weights = tf.nn.softmax(score, axis=1)
+
+    # (batch_size, hidden_size)
+    context_vector = tf.reduce_sum(input_tensor=attention_weights * encoded, axis=1)
+
+    return context_vector, attention_weights
+    
