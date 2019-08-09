@@ -169,8 +169,9 @@ class TextWorld(object):
         
         return commands
     
-    def get_preprocessed_state2(self, entities, num_entities):
+    def get_preprocessed_state2(self, entities):
         batched_curr_entities = []
+        num_entities = 2 + max([sum([len(values) for values in batch.values()]) for batch in entities])
         for _, batch in enumerate(entities):
             curr_entities = [self.start]
             # Create (num_entities, max_entity_len) size list

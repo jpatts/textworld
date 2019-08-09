@@ -3,17 +3,17 @@ import numpy as np
 
 
 class Seq2seq(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_size, units):
+    def __init__(self, vocab_size, embedding_size, units, dropout):
         super(Seq2seq, self).__init__()
-        self.encoder = Encoder(vocab_size, embedding_size, units)
-        self.decoder = Decoder(vocab_size, embedding_size, units)
+        self.encoder = Encoder(vocab_size, embedding_size, units, dropout)
+        self.decoder = Decoder(vocab_size, embedding_size, units, dropout)
         self.vocab_size = vocab_size
     
-    def call(self, enc_in, max_cmd_len, teacher):
+    def call(self, enc_in, max_cmd_len, teacher, batch_size):
+        self.encoder.reset_hidden(batch_size)
         # Get encoded data and hidden state
         encoded, enc_hidden = self.encoder(enc_in)
         
-        batch_size = enc_hidden.shape[0]
         # Init hidden state
         dec_hidden = enc_hidden
         # Init output data structures
@@ -35,12 +35,12 @@ class Seq2seq(tf.keras.Model):
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, embedding_size, enc_units):
+    def __init__(self, vocab_size, embedding_size, enc_units, dropout):
         super(Encoder, self).__init__()
         self.enc_units = enc_units
         
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_size)
-        self.gru = tf.keras.layers.GRU(enc_units, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
+        self.gru = tf.keras.layers.GRU(enc_units, dropout=dropout, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
 
     def call(self, x_in):
         # x_in shape = (batch_size, num_entites * max_entity_length)
@@ -54,13 +54,14 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, embedding_size, dec_units):
+    def __init__(self, vocab_size, embedding_size, dec_units, dropout):
         super(Decoder, self).__init__()
+        self.attention = BahdanauAttention(dec_units)
         
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_size)
-        self.gru = tf.keras.layers.GRU(dec_units, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
+        self.gru = tf.keras.layers.GRU(dec_units, dropout=dropout, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
         self.fc = tf.keras.layers.Dense(vocab_size)
-        self.attention = BahdanauAttention(dec_units)
+        self.dropout = tf.keras.layers.Dropout(rate=dropout)
 
     def call(self, x_in, enc_hidden, encoded):
         # (batch_size, max_length, hidden_size)
@@ -80,7 +81,7 @@ class Decoder(tf.keras.layers.Layer):
         # (batch_size, vocab)
         x_out = self.fc(decoded)
 
-        return x_out, dec_hidden, attention_weights
+        return self.dropout(x_out), dec_hidden, attention_weights
 
 
 class BahdanauAttention(tf.keras.Model):

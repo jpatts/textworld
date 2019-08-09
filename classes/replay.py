@@ -14,6 +14,19 @@ class Replay:
         if size == self.cap:
             self.memory.pop(random.randint(0, size-1))
         self.memory.append(exp)
+        
+    def push_unique(self, exp):
+        size = len(self.memory)
+        if len(self.memory) > 0:
+            ids, _, _, _ = zip(*self.memory)
+            # check if id already in memory
+            if exp[0] not in ids:
+                # Remove oldest memory first
+                if size == self.cap:
+                    self.memory.pop(random.randint(0, size-1))
+                self.memory.append(exp)
+        else:
+            self.memory.append(exp)
     
     def fetch(self):
         size = len(self.memory)

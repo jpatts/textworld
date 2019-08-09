@@ -7,3 +7,4 @@ env/
 utils/random_ideas.py
 logs/
 saves/
+__pycache__
