@@ -8,7 +8,7 @@ class Writer(object):
 
     def __init__(self, extension, save_dir, log_dir, log_freq):
         super(Writer, self).__init__()
-        self.global_step = tf.train.get_or_create_global_step()
+        self.global_step = tf.compat.v1.train.get_or_create_global_step()
 
         if not Path(save_dir).is_dir():
             os.mkdir(save_dir)

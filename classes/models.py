@@ -3,21 +3,21 @@ import numpy as np
 
 
 class Seq2seq(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_size, batch_size, units):
+    def __init__(self, vocab_size, embedding_size, units):
         super(Seq2seq, self).__init__()
-        self.encoder = Encoder(vocab_size, embedding_size, batch_size, units)
+        self.encoder = Encoder(vocab_size, embedding_size, units)
         self.decoder = Decoder(vocab_size, embedding_size, units)
         self.vocab_size = vocab_size
-        self.batch_size = batch_size
     
     def call(self, enc_in, max_cmd_len, teacher):
         # Get encoded data and hidden state
-        encoded, self.enc_hidden = self.encoder(enc_in)
+        encoded, enc_hidden = self.encoder(enc_in)
+        batch_size = enc_hidden.shape[0]
         # Init hidden state
-        dec_hidden = self.enc_hidden
+        dec_hidden = enc_hidden
         # Init output data structures
-        logits = tf.zeros((self.batch_size, 1, self.vocab_size))
-        predictions = tf.zeros((self.batch_size, 1), dtype=tf.dtypes.int64)
+        logits = tf.zeros((batch_size, 1, self.vocab_size))
+        predictions = tf.zeros((batch_size, 1), dtype=tf.dtypes.int64)
         # For timestep in max timesteps
         for t in range(max_cmd_len):
             # Get input for timestep
@@ -27,16 +27,16 @@ class Seq2seq(tf.keras.Model):
             # Save logits
             logits = tf.concat([logits[:, :t], tf.expand_dims(logits_t, 1)], 1)
             # Save prediction
-            pred = tf.reshape(tf.argmax(logits_t, 1), [self.batch_size, 1])
+            pred = tf.reshape(tf.argmax(input=logits_t, axis=1), [batch_size, 1])
             predictions = tf.concat([predictions[:, :t], pred], 1)
         
         return logits, predictions
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, embedding_size, batch_size, enc_units):
+    def __init__(self, vocab_size, embedding_size, enc_units):
         super(Encoder, self).__init__()
-        self.enc_hidden = tf.zeros((batch_size, enc_units))
+        self.enc_units = enc_units
         
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_size)
         self.gru = tf.keras.layers.GRU(enc_units, return_sequences=True, return_state=True, recurrent_initializer='glorot_uniform')
@@ -47,6 +47,9 @@ class Encoder(tf.keras.layers.Layer):
         encoded, self.enc_hidden = self.gru(embedded, initial_state=self.enc_hidden)
         # (batch_size, num_entities * max_entity_length, units), (batch_size, units)
         return encoded, self.enc_hidden
+    
+    def reset_hidden(self, batch_size):
+        self.enc_hidden = tf.zeros((batch_size, self.enc_units))
 
 
 class BahdanauAttention(tf.keras.Model):
@@ -57,19 +60,15 @@ class BahdanauAttention(tf.keras.Model):
     self.V = tf.keras.layers.Dense(1)
 
   def call(self, enc_hidden, encoded):
-    # (batch_size, 1, hidden size)
-    hidden_with_time_axis = tf.expand_dims(enc_hidden, 1)
-
     # (batch_size, max_length, 1)
     score = self.V(tf.nn.tanh(
-        self.W1(encoded) + self.W2(hidden_with_time_axis)))
+        self.W1(encoded) + self.W2(tf.expand_dims(enc_hidden, 1))))
 
     # (batch_size, max_length, 1)
     attention_weights = tf.nn.softmax(score, axis=1)
 
-    context_vector = attention_weights * encoded
     # (batch_size, hidden_size)
-    context_vector = tf.reduce_sum(context_vector, axis=1)
+    context_vector = tf.reduce_sum(input_tensor=attention_weights * encoded, axis=1)
 
     return context_vector, attention_weights
     

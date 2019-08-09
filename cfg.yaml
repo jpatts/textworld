@@ -1,26 +1,39 @@
-general:
-  data_dir: '/home/jojo/Documents/textworld/sample_games/' #location of game data
+#****************
+# General Params 
+#****************
+data_dir: '/home/jojo/Documents/textworld/sample_games/' #location of game data
 
-writing:
-  extension: '' #name to save as
-  save_dir: './saves/' #directory to save in
-  save_freq: 10 #episodes before saving
-  log_dir: './logs/' #directory to log in
-  log_freq: 10 #episodes before logging
+#**************
+# Model Params
+#**************
+embedding_size: 64 #of each word vector (4th root = 12), neurons in GRU
+units: 1024 #number of neurons in gru
 
-vocab:
-  size: 20200 #unique words/chars in dataset
+#************
+# I/O Params 
+#************
+extension: '' #name to save as
+save_dir: './saves/' #directory to save in
+save_freq: 10 #episodes before saving
+log_dir: './logs/' #directory to log in
+log_freq: 1 #episodes before logging
 
-replay:
-  cap: 20000 #max transitions in replay memory
+#**************
+# Vocab Params
+#**************
+vocab_size: 20200 #unique words/chars in dataset
 
-train:
-  learning_rate: 0.001 #gradient step size
-  batch_size: 1
-  epochs: 100 #episodes
-  max_steps: 10  #episode ends after 50 actions
-  optim: 'adam'
+#***************
+# Replay Params
+#***************
+cap: 2000 #max transitions in replay memory
 
-model:
-  embedding_size: 64 #of each word vector (4th root = 12), neurons in GRU
-  units: 1024 #number of neurons in gru
+#**************
+# Train Params
+#**************
+learning_rate: 0.001 #gradient step size
+num_agents: 1
+batch_size: 8
+epochs: 100 #episodes
+max_steps: 10  #episode ends after 50 actions
+optim: 'adam'
