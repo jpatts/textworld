@@ -14,7 +14,7 @@ The following information is needed in order to get this project running on your
 ### Environment
 
 1. Create a `virtualenv` using `python3 -m virtualenv env`. Run `source env/bin/activate` to start the environment, and `deactivate` to close it.
-2. Install dependencies using `pip3 install -r requirements.txt`
+2. Install dependencies using `pip3 install -r requirements.txt` both in the main and /PlaNet folders
 
 ### Train
 
