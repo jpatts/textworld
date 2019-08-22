@@ -64,15 +64,14 @@ for episode in trange(cfg['train']['episodes']):
 
             beliefs_in = tf.reshape(beliefs, [beliefs.shape[0] * beliefs.shape[1], *beliefs.shape[2:]])
             posterior_states_in = tf.reshape(posterior_states, [posterior_states.shape[0] * posterior_states.shape[1], *posterior_states.shape[2:]])
+            # FAILS HERE DUE TO CONV SHAPE MISMATCH
             obs_logits = observation_model(beliefs_in, posterior_states_in)
-            print('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+
             obs_logits = tf.reshape(obs_logits, [beliefs.shape[0], beliefs.shape[1], *obs_logits.shape[1:]])
             # Calculate observation likelihood
             obs_loss = tf.keras.losses.MSE(obs_logits, obs[1:], REDUCTION='NONE')
             obs_loss = tf.reduce_sum(obs_loss, axis=[2, 3, 4])
             obs_loss = tf.reduce_mean(obs_loss, axis=[0, 1])
-            print('sex')
-            exit(1)
 
             # Calculate reward likelihood
             reward_logits = reward_model(beliefs, posterior_states)

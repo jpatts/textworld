@@ -5,7 +5,7 @@ This repository holds the final project deliverable for CSC 490, directed studie
 
 This implementation uses the 2018 Textworld API to generate stochastic environments for text-based training.
 
-The paper is in the repository and called "Textworld_PlaNet.pdf".
+The paper is in the repository and called "Report.pdf".
 
 ## Get Started
 
